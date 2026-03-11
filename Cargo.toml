@@ -2,6 +2,7 @@
 name = "codex-pool"
 version = "0.1.1"
 edition = "2024"
+license = "MIT"
 
 [dependencies]
 anyhow = "1.0"
