@@ -1,71 +1,73 @@
 # codex-pool
 
-感谢 [codex-tools](https://github.com/170-carry/codex-tools) 提供了成熟的多账号管理实现思路，`codex-pool` 的核心账号解析、用量抓取和切换流程参考并裁剪自这个项目。
+[English](./README.md) | [简体中文](./README.zh-CN.md)
 
-`codex-pool` 是一个面向 Codex CLI 的多账号池管理工具，解决这几件事：
+Thanks to [codex-tools](https://github.com/170-carry/codex-tools) for the proven multi-account management approach. The core account parsing, usage fetching, and switching flow in `codex-pool` is adapted and trimmed from that project.
 
-- 管理多个 Codex 账号
-- 查看每个账号的 5h / 1week 用量
-- 一键切换到最佳可用账号
-- 直接切换后启动 `codex`
-- 对过期账号执行重新授权
+`codex-pool` is a multi-account pool manager for Codex CLI. It is designed to help with:
 
-它和桌面版 `codex-tools` 的关系是：
+- Managing multiple Codex accounts
+- Viewing 5h / 1week usage for each account
+- Switching to the best available account with one command
+- Launching `codex` immediately after switching
+- Re-authorizing expired accounts
 
-- `codex-pool` 只做 CLI，不做 GUI、tray、proxy、cloudflared
-- `codex-pool` 独立使用 `~/.codex-pool/accounts.json`
-- `codex-pool` 可以从旧版 `codex-tools` 仓库一次性导入账号
-- 真正生效的 live auth 仍然是 `~/.codex/auth.json`
+Compared with the desktop `codex-tools`, `codex-pool` is:
 
-## 安装
+- CLI-only, with no GUI, tray, proxy, or cloudflared features
+- Using its own account store at `~/.codex-pool/accounts.json`
+- Able to import accounts from the legacy `codex-tools` repository in one shot
+- Still relying on `~/.codex/auth.json` as the live auth that actually takes effect
 
-发布后可直接执行：
+## Installation
+
+After a release is published, install it with:
 
 ```bash
 curl -fsSL https://github.com/lilong7676/codex-pool/releases/latest/download/install.sh | sh
 ```
 
-默认安装到 `~/.local/bin`。可通过环境变量覆盖：
+By default, it installs to `~/.local/bin`. Override it with environment variables if needed:
 
 ```bash
 INSTALL_DIR="$HOME/bin" VERSION="v0.1.1" curl -fsSL https://github.com/lilong7676/codex-pool/releases/latest/download/install.sh | sh
 ```
 
-前置要求：
+Prerequisites:
 
-- 已安装官方 `codex` CLI
-- `codex login` 可正常在浏览器中完成授权
-- 首版支持 macOS 和 Linux
+- The official `codex` CLI is already installed
+- `codex login` can complete authorization successfully in your browser
+- The first release supports macOS and Linux
 
-## 首次引导
+## First-Time Setup
 
-安装后运行：
+Run this after installation:
 
 ```bash
 codex-pool init
 ```
 
-`init` 会依次做这些事：
+`init` performs the following steps:
 
-1. 检查 `codex` CLI 是否可用
-2. 检查当前 `~/.codex/auth.json` 是否存在，并询问是否导入
-3. 探测旧版 `codex-tools` 仓库，并询问是否迁移
-4. 循环引导你添加一个或多个账号
-5. 最后给出常用命令提示
+1. Check whether the `codex` CLI is available
+2. Check whether the current `~/.codex/auth.json` exists and ask whether to import it
+3. Detect a legacy `codex-tools` repository and ask whether to migrate it
+4. Walk you through adding one or more accounts
+5. Print a short summary of common commands at the end
 
-添加账号的方式不是自己实现 OAuth，而是借用官方 `codex login`：
+Account adding does not implement OAuth independently. Instead, it reuses the official `codex login` flow:
 
-- 先备份当前 `~/.codex/auth.json`
-- 运行 `codex login`
-- 等待新的授权文件出现
-- 导入新账号进 `codex-pool`
-- 最后恢复原来的 live auth
+- Back up the current `~/.codex/auth.json`
+- Run `codex login`
+- Wait for the new auth file to appear
+- Import the new account into `codex-pool`
+- Restore the previous live auth at the end
 
-这意味着你在添加账号时，不会把当前正在使用的账号永久改掉。
+This means adding an account will not permanently replace the account you are currently using.
 
-## 常用命令
+## Common Commands
 
-查看账号列表：
+List accounts:
 
 ```bash
 codex-pool list
@@ -73,14 +75,14 @@ codex-pool list --refresh
 codex-pool list --refresh --json
 ```
 
-监控用量：
+Watch usage:
 
 ```bash
 codex-pool watch
 codex-pool watch --interval 30
 ```
 
-添加 / 删除账号：
+Add / remove accounts:
 
 ```bash
 codex-pool add
@@ -88,14 +90,14 @@ codex-pool add --label "Work Pro"
 codex-pool rm <account-ref>
 ```
 
-切换账号：
+Switch accounts:
 
 ```bash
 codex-pool use <account-ref>
 codex-pool use --best
 ```
 
-切换后直接启动 `codex`：
+Switch and launch `codex` immediately:
 
 ```bash
 codex-pool run --best
@@ -103,100 +105,100 @@ codex-pool run --best -- exec "fix the failing tests"
 codex-pool run <account-ref> -- app
 ```
 
-刷新用量：
+Refresh usage:
 
 ```bash
 codex-pool refresh
 codex-pool refresh <account-ref>
 ```
 
-重新授权：
+Re-authorize an account:
 
 ```bash
 codex-pool reauth <account-ref>
 ```
 
-健康检查：
+Run health checks:
 
 ```bash
 codex-pool doctor
 ```
 
-## 账号引用规则
+## Account Reference Rules
 
-`<account-ref>` 支持三种形式，优先级固定：
+`<account-ref>` supports three forms with fixed priority:
 
-1. 精确匹配内部 `id`
-2. 精确匹配 `account_id`
-3. 唯一前缀匹配 `id` 或 `account_id`
+1. Exact match on the internal `id`
+2. Exact match on `account_id`
+3. Unique prefix match on `id` or `account_id`
 
-如果前缀匹配到多个账号，命令会报错并列出候选。
+If a prefix matches multiple accounts, the command fails and prints the candidates.
 
-## 最佳账号切换规则
+## Best-Account Selection Rules
 
-`--best` 的排序口径固定为：
+`--best` uses this fixed ranking order:
 
-1. 优先比较 `1week` 剩余比例
-2. 再比较 `5h` 剩余比例
-3. 再偏向当前 live account
-4. 最后按 label 稳定排序
+1. Compare remaining `1week` ratio first
+2. Then compare remaining `5h` ratio
+3. Prefer the current live account next
+4. Finally use `label` as a stable tie-breaker
 
-这些状态不会参与 `--best`：
+These states are excluded from `--best`:
 
 - `expired`
 - `workspace_removed`
 
-## 重新授权
+## Re-Authorization
 
-当某个账号的 refresh token 失效后，`list --refresh` 往往会显示：
+When an account's refresh token becomes invalid, `list --refresh` often shows:
 
 - `expired`
-- 或 `reauth_required`
+- `reauth_required`
 
-此时执行：
+Then run:
 
 ```bash
 codex-pool reauth <account-ref>
 ```
 
-`reauth` 会重新走一次 `codex login`，但有一个硬校验：
+`reauth` runs the `codex login` flow again, but with one strict validation:
 
-- 新登录出来的 `account_id` 必须和目标账号一致
-- 如果你浏览器里登录成了另一个账号，操作会失败并恢复原来的 live auth
+- The newly logged-in `account_id` must match the target account
+- If your browser signs in to a different account, the operation fails and restores the previous live auth
 
-## 从 codex-tools 迁移
+## Migrate from codex-tools
 
-如果你之前用过桌面版 `codex-tools`，可以迁移账号仓库：
+If you previously used the desktop `codex-tools`, you can migrate its account store:
 
 ```bash
 codex-pool import codex-tools
 ```
 
-也可以指定旧仓库路径：
+You can also provide the legacy repository path explicitly:
 
 ```bash
 codex-pool import codex-tools --path /path/to/accounts.json
 ```
 
-默认探测路径：
+Default lookup paths:
 
 - macOS: `~/Library/Application Support/com.carry.codex-tools/accounts.json`
 - Linux: `~/.local/share/com.carry.codex-tools/accounts.json`
 
-## 数据文件
+## Data Files
 
-- `~/.codex-pool/accounts.json`: `codex-pool` 的账号仓库
-- `~/.codex-pool/config.toml`: `codex-pool` 配置
-- `~/.codex/auth.json`: 当前 live Codex auth，切换账号时直接写这个文件
+- `~/.codex-pool/accounts.json`: account store used by `codex-pool`
+- `~/.codex-pool/config.toml`: `codex-pool` configuration
+- `~/.codex/auth.json`: current live Codex auth; account switching writes this file directly
 
-## 开发
+## Development
 
 ```bash
 cargo test
 cargo run -- --help
 ```
 
-发布 workflow 会构建这些产物：
+The release workflow builds these artifacts:
 
 - `codex-pool-aarch64-apple-darwin.tar.gz`
 - `codex-pool-x86_64-apple-darwin.tar.gz`
