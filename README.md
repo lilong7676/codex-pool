@@ -1,5 +1,7 @@
 # codex-pool
 
+感谢 [codex-tools](https://github.com/170-carry/codex-tools) 提供了成熟的多账号管理实现思路，`codex-pool` 的核心账号解析、用量抓取和切换流程参考并裁剪自这个项目。
+
 `codex-pool` 是一个面向 Codex CLI 的多账号池管理工具，解决这几件事：
 
 - 管理多个 Codex 账号
