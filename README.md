@@ -28,7 +28,7 @@ curl -fsSL https://github.com/lilong7676/codex-pool/releases/latest/download/ins
 默认安装到 `~/.local/bin`。可通过环境变量覆盖：
 
 ```bash
-INSTALL_DIR="$HOME/bin" VERSION="v0.1.0" curl -fsSL https://github.com/lilong7676/codex-pool/releases/latest/download/install.sh | sh
+INSTALL_DIR="$HOME/bin" VERSION="v0.1.1" curl -fsSL https://github.com/lilong7676/codex-pool/releases/latest/download/install.sh | sh
 ```
 
 前置要求：
