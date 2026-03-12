@@ -1,4 +1,5 @@
 use std::io;
+use std::io::IsTerminal;
 use std::os::unix::process::CommandExt;
 use std::path::PathBuf;
 use std::process::Stdio;
@@ -19,6 +20,7 @@ use crate::models::StoredAccount;
 use crate::output::render_account_table;
 use crate::ranking::pick_best_account;
 use crate::store;
+use crate::updater;
 use crate::usage;
 use crate::utils::short_account;
 
@@ -79,6 +81,12 @@ enum Commands {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         codex_args: Vec<String>,
     },
+    Update {
+        #[arg(long)]
+        version: Option<String>,
+        #[arg(long)]
+        yes: bool,
+    },
     Doctor,
 }
 
@@ -128,8 +136,72 @@ pub async fn run_cli() -> Result<()> {
             best,
             codex_args,
         } => run_command(&context, account_ref.as_deref(), best, &codex_args).await,
+        Commands::Update { version, yes } => update_command(version.as_deref(), yes).await,
         Commands::Doctor => doctor_command(&context),
     }
+}
+
+async fn update_command(version: Option<&str>, yes: bool) -> Result<()> {
+    let install_path = updater::resolve_install_path("codex-pool")?;
+    let requested_tag = updater::normalize_requested_version(version);
+    let current_version = updater::current_installed_version(&install_path);
+
+    if let Some(tag) = requested_tag.as_deref() {
+        if current_version.as_deref() == Some(tag.trim_start_matches('v')) {
+            println!(
+                "codex-pool {} is already installed at {}",
+                tag,
+                install_path.display()
+            );
+            return Ok(());
+        }
+    }
+
+    if !yes {
+        if !io::stdin().is_terminal() || !io::stderr().is_terminal() {
+            anyhow::bail!("update requires confirmation; rerun with --yes");
+        }
+
+        let action = if install_path.exists() {
+            "Update"
+        } else {
+            "Install"
+        };
+        let target = requested_tag
+            .clone()
+            .unwrap_or_else(|| "the latest release".to_string());
+        let prompt = match current_version {
+            Some(current) => format!(
+                "{action} codex-pool at {} from {} to {}?",
+                install_path.display(),
+                current,
+                target
+            ),
+            None => format!(
+                "{action} codex-pool at {} from GitHub Releases ({target})?",
+                install_path.display()
+            ),
+        };
+        let confirmed = Confirm::new()
+            .with_prompt(prompt)
+            .default(true)
+            .interact()?;
+        if !confirmed {
+            println!("update cancelled");
+            return Ok(());
+        }
+    }
+
+    let installed = updater::download_and_install(requested_tag.as_deref(), &install_path).await?;
+    let installed_version = installed
+        .reported_version
+        .unwrap_or(installed.requested_version);
+    println!(
+        "installed codex-pool {} to {}",
+        installed_version,
+        installed.install_path.display()
+    );
+    Ok(())
 }
 
 async fn init_command(context: &AppContext) -> Result<()> {

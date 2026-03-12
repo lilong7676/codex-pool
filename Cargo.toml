@@ -1,6 +1,6 @@
 [package]
 name = "codex-pool"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 license = "MIT"
 
@@ -11,13 +11,14 @@ clap = { version = "4.5", features = ["derive"] }
 comfy-table = "7.1"
 dialoguer = "0.11"
 dirs = "6"
+flate2 = "1.1"
 reqwest = { version = "0.12", default-features = false, features = ["gzip", "json", "rustls-tls"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+sha2 = "0.10"
+tar = "0.4"
+tempfile = "3.20"
 time = { version = "0.3", features = ["formatting", "local-offset"] }
 tokio = { version = "1.46", features = ["macros", "rt-multi-thread", "time"] }
 toml = "0.8"
 uuid = { version = "1", features = ["v4"] }
-
-[dev-dependencies]
-tempfile = "3.20"

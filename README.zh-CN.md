@@ -30,7 +30,7 @@ curl -fsSL https://github.com/lilong7676/codex-pool/releases/latest/download/ins
 默认安装到 `~/.local/bin`。可通过环境变量覆盖：
 
 ```bash
-INSTALL_DIR="$HOME/bin" VERSION="v0.1.1" curl -fsSL https://github.com/lilong7676/codex-pool/releases/latest/download/install.sh | sh
+INSTALL_DIR="$HOME/bin" VERSION="v0.1.2" curl -fsSL https://github.com/lilong7676/codex-pool/releases/latest/download/install.sh | sh
 ```
 
 前置要求：
@@ -47,7 +47,7 @@ INSTALL_DIR="$HOME/bin" VERSION="v0.1.1" curl -fsSL https://github.com/lilong767
 npx skills add lilong7676/codex-pool --skill codex-pool
 ```
 
-skill 目录位于当前仓库的 `skills/codex-pool/`。首次使用时，它会先检查本机是否已有 `codex-pool`，如果没有就自动安装最新的 GitHub Release 二进制。
+skill 目录位于当前仓库的 `skills/codex-pool/`。首次使用时，它会先检查本机是否已有 `codex-pool`，以及当前版本是否与 skill 固定的 `v0.1.2` 一致。如果缺失或版本落后，skill 会先说明将从当前仓库的 GitHub Releases 下载固定版本归档和对应 SHA256 文件，校验成功后安装或升级到 `~/.local/bin`（或 `INSTALL_DIR`），并且只有在用户明确确认后才继续。
 
 skill 的前置要求不变：
 
@@ -63,6 +63,34 @@ skill 的前置要求不变：
 ```bash
 codex-pool init
 ```
+
+## 更新
+
+原地升级已安装的 `codex-pool`：
+
+```bash
+codex-pool update
+```
+
+固定到某个 release tag：
+
+```bash
+codex-pool update --version v0.1.2
+```
+
+如果你更倾向于走发布脚本，也可以重新执行：
+
+```bash
+curl -fsSL https://github.com/lilong7676/codex-pool/releases/latest/download/install.sh | sh
+```
+
+如果要更新 skill 文件本身，重新执行：
+
+```bash
+npx skills add lilong7676/codex-pool --skill codex-pool
+```
+
+skill 更新后，下一次触发 skill 时会比较本机 `codex-pool` 版本和 skill 固定版本；如果不一致，会提示你确认升级。
 
 `init` 会依次做这些事：
 
@@ -139,6 +167,7 @@ codex-pool reauth <account-ref>
 
 ```bash
 codex-pool doctor
+codex-pool update --yes
 ```
 
 ## 账号引用规则
@@ -218,6 +247,9 @@ cargo run -- --help
 发布 workflow 会构建这些产物：
 
 - `codex-pool-aarch64-apple-darwin.tar.gz`
+- `codex-pool-aarch64-apple-darwin.tar.gz.sha256`
 - `codex-pool-x86_64-apple-darwin.tar.gz`
+- `codex-pool-x86_64-apple-darwin.tar.gz.sha256`
 - `codex-pool-x86_64-unknown-linux-gnu.tar.gz`
+- `codex-pool-x86_64-unknown-linux-gnu.tar.gz.sha256`
 - `install.sh`

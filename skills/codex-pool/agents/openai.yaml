@@ -1,4 +1,4 @@
 interface:
   display_name: "Codex Pool"
   short_description: "Manage Codex multi-account pool workflows"
-  default_prompt: "Use $codex-pool to inspect, switch, or re-authorize Codex CLI accounts safely."
+  default_prompt: "Use $codex-pool to inspect Codex CLI accounts first, and only install, upgrade, switch, re-authorize, or launch another process after explicit user confirmation."

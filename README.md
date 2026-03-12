@@ -30,7 +30,7 @@ curl -fsSL https://github.com/lilong7676/codex-pool/releases/latest/download/ins
 By default, it installs to `~/.local/bin`. Override it with environment variables if needed:
 
 ```bash
-INSTALL_DIR="$HOME/bin" VERSION="v0.1.1" curl -fsSL https://github.com/lilong7676/codex-pool/releases/latest/download/install.sh | sh
+INSTALL_DIR="$HOME/bin" VERSION="v0.1.2" curl -fsSL https://github.com/lilong7676/codex-pool/releases/latest/download/install.sh | sh
 ```
 
 Prerequisites:
@@ -47,7 +47,7 @@ You can also install `codex-pool` as a Codex skill:
 npx skills add lilong7676/codex-pool --skill codex-pool
 ```
 
-The skill lives in `skills/codex-pool/` in this repository. On first use it checks whether `codex-pool` is already available and installs the latest GitHub Release binary if needed.
+The skill lives in `skills/codex-pool/` in this repository. On first use it checks whether `codex-pool` is already available and whether its version matches the skill's pinned `v0.1.2` release. If it is missing or older, the skill explains that it will download the pinned archive plus its SHA256 file from this repository's GitHub Releases, verify the checksum, and install or upgrade the binary in `~/.local/bin` (or `INSTALL_DIR`). It only proceeds after explicit user confirmation.
 
 Skill prerequisites stay the same:
 
@@ -63,6 +63,34 @@ Run this after installation:
 ```bash
 codex-pool init
 ```
+
+## Updating
+
+Update the installed `codex-pool` binary in place:
+
+```bash
+codex-pool update
+```
+
+Pin a specific release tag:
+
+```bash
+codex-pool update --version v0.1.2
+```
+
+If you prefer the published shell installer, rerun:
+
+```bash
+curl -fsSL https://github.com/lilong7676/codex-pool/releases/latest/download/install.sh | sh
+```
+
+To refresh the skill files themselves, rerun:
+
+```bash
+npx skills add lilong7676/codex-pool --skill codex-pool
+```
+
+After the skill updates, the next skill invocation will compare the installed `codex-pool` version with the skill's pinned version and offer an upgrade when they differ.
 
 `init` performs the following steps:
 
@@ -139,6 +167,7 @@ Run health checks:
 
 ```bash
 codex-pool doctor
+codex-pool update --yes
 ```
 
 ## Account Reference Rules
@@ -218,6 +247,9 @@ cargo run -- --help
 The release workflow builds these artifacts:
 
 - `codex-pool-aarch64-apple-darwin.tar.gz`
+- `codex-pool-aarch64-apple-darwin.tar.gz.sha256`
 - `codex-pool-x86_64-apple-darwin.tar.gz`
+- `codex-pool-x86_64-apple-darwin.tar.gz.sha256`
 - `codex-pool-x86_64-unknown-linux-gnu.tar.gz`
+- `codex-pool-x86_64-unknown-linux-gnu.tar.gz.sha256`
 - `install.sh`

@@ -48,6 +48,8 @@ resolve_url() {
 
 target="$(detect_target)"
 url="$(resolve_url "$target")"
+archive="${BIN_NAME}-${target}.tar.gz"
+checksum_url="${url}.sha256"
 
 tmp_dir="$(mktemp -d)"
 cleanup() {
@@ -55,11 +57,30 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
+verify_archive() {
+  checksum_path="$1"
+
+  if command -v sha256sum >/dev/null 2>&1; then
+    (cd "$tmp_dir" && sha256sum -c "$(basename "$checksum_path")")
+    return 0
+  fi
+
+  if command -v shasum >/dev/null 2>&1; then
+    (cd "$tmp_dir" && shasum -a 256 -c "$(basename "$checksum_path")")
+    return 0
+  fi
+
+  echo "Missing checksum verifier: need sha256sum or shasum." >&2
+  exit 1
+}
+
 mkdir -p "$INSTALL_DIR"
 
 echo "Downloading $BIN_NAME for $target"
-curl -fsSL "$url" -o "$tmp_dir/${BIN_NAME}.tar.gz"
-tar -xzf "$tmp_dir/${BIN_NAME}.tar.gz" -C "$tmp_dir"
+curl -fsSL "$url" -o "$tmp_dir/$archive"
+curl -fsSL "$checksum_url" -o "$tmp_dir/${archive}.sha256"
+verify_archive "$tmp_dir/${archive}.sha256"
+tar -xzf "$tmp_dir/$archive" -C "$tmp_dir"
 install -m 0755 "$tmp_dir/$BIN_NAME" "$INSTALL_DIR/$BIN_NAME"
 
 echo "Installed to $INSTALL_DIR/$BIN_NAME"

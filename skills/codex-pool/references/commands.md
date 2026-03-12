@@ -2,11 +2,17 @@
 
 Use these commands in this order unless the user asks for a different flow.
 
+## Bootstrap
+
+- First check `command -v codex-pool`.
+- If `codex-pool` is missing or older than the pinned skill version, explain that installation downloads the pinned release archive and SHA256 file from this repository's GitHub Releases and installs or upgrades `${INSTALL_DIR:-$HOME/.local/bin}/codex-pool`.
+- Only after explicit user confirmation, run `CODEX_POOL_INSTALL_APPROVED=1 ./scripts/ensure-codex-pool.sh`.
+
 ## Recommended sequence
 
 1. `codex-pool doctor`
 2. `codex-pool list --refresh`
-3. `codex-pool use --best` or `codex-pool run --best`
+3. `codex-pool use --best` after confirmation, or `codex-pool run --best` only if the user explicitly asks to launch a process
 
 ## Non-mutating commands
 
@@ -17,12 +23,13 @@ Use these commands in this order unless the user asks for a different flow.
 
 ## Mutating commands
 
-- `codex-pool init`: first-time setup flow. It may import the current auth, migrate legacy `codex-tools` accounts, and guide the user through adding accounts.
-- `codex-pool add [--label ...]`: runs the official `codex login` flow, imports the new account, and restores the prior live auth afterward.
-- `codex-pool reauth <account-ref>`: runs `codex login` again for one stored account. The newly logged-in `account_id` must match the target account or the operation fails.
-- `codex-pool use <account-ref>`: writes the chosen account into `~/.codex/auth.json`.
-- `codex-pool use --best`: writes the highest-ranked available account into `~/.codex/auth.json`.
-- `codex-pool run ...`: switches auth first, then launches `codex`.
+- `codex-pool init`: first-time setup flow. It may import the current auth, migrate legacy `codex-tools` accounts, and guide the user through adding accounts. Run it only after explicit user confirmation.
+- `codex-pool add [--label ...]`: runs the official `codex login` flow, imports the new account, and restores the prior live auth afterward. Run it only after explicit user confirmation.
+- `codex-pool reauth <account-ref>`: runs `codex login` again for one stored account. The newly logged-in `account_id` must match the target account or the operation fails. Run it only after explicit user confirmation.
+- `codex-pool use <account-ref>`: writes the chosen account into `~/.codex/auth.json`. Run it only after explicit user confirmation.
+- `codex-pool use --best`: writes the highest-ranked available account into `~/.codex/auth.json`. Run it only after explicit user confirmation.
+- `codex-pool run ...`: switches auth first, then launches `codex` or another program. Use it only when the user explicitly asks to launch a process.
+- `codex-pool update [--version <tag>] [--yes]`: downloads a GitHub Release archive plus checksum and upgrades the installed binary in place. Run it only after explicit user confirmation.
 
 ## Best-account ranking
 
@@ -53,4 +60,4 @@ If a prefix matches multiple accounts, the command fails and shows candidates.
 - macOS: `aarch64`, `x86_64`
 - Linux: `x86_64`
 
-The skill installer script uses the same published GitHub Release assets as the project install script.
+The skill installer script uses this repository's pinned GitHub Release archive plus its published SHA256 checksum.

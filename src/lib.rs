@@ -5,6 +5,7 @@ pub mod models;
 pub mod output;
 pub mod ranking;
 pub mod store;
+pub mod updater;
 pub mod usage;
 pub mod utils;
 

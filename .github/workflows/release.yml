@@ -49,10 +49,17 @@ jobs:
           archive="codex-pool-${{ matrix.target }}.tar.gz"
           cp "target/${{ matrix.target }}/release/codex-pool" .
           tar -czf "$archive" codex-pool
+          if command -v sha256sum >/dev/null 2>&1; then
+            sha256sum "$archive" > "$archive.sha256"
+          else
+            shasum -a 256 "$archive" > "$archive.sha256"
+          fi
       - name: Upload release asset
         uses: softprops/action-gh-release@v2
         with:
-          files: codex-pool-${{ matrix.target }}.tar.gz
+          files: |
+            codex-pool-${{ matrix.target }}.tar.gz
+            codex-pool-${{ matrix.target }}.tar.gz.sha256
 
   release-install-script:
     if: startsWith(github.ref, 'refs/tags/v')
