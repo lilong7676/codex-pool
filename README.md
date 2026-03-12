@@ -39,6 +39,23 @@ Prerequisites:
 - `codex login` can complete authorization successfully in your browser
 - The first release supports macOS and Linux
 
+## Agent Skill
+
+You can also install `codex-pool` as a Codex skill:
+
+```bash
+npx skills add lilong7676/codex-pool --skill codex-pool
+```
+
+The skill lives in `skills/codex-pool/` in this repository. On first use it checks whether `codex-pool` is already available and installs the latest GitHub Release binary if needed.
+
+Skill prerequisites stay the same:
+
+- The official `codex` CLI is already installed
+- `codex login` can complete authorization successfully in your browser
+
+The skill is distributed from this public GitHub repository. After users install it with `npx skills add`, `skills.sh` can pick it up from anonymous installation telemetry; there is no separate manual publish flow.
+
 ## First-Time Setup
 
 Run this after installation:

@@ -39,6 +39,23 @@ INSTALL_DIR="$HOME/bin" VERSION="v0.1.1" curl -fsSL https://github.com/lilong767
 - `codex login` 可正常在浏览器中完成授权
 - 首版支持 macOS 和 Linux
 
+## Agent Skill
+
+也可以把 `codex-pool` 作为 Codex skill 安装：
+
+```bash
+npx skills add lilong7676/codex-pool --skill codex-pool
+```
+
+skill 目录位于当前仓库的 `skills/codex-pool/`。首次使用时，它会先检查本机是否已有 `codex-pool`，如果没有就自动安装最新的 GitHub Release 二进制。
+
+skill 的前置要求不变：
+
+- 已安装官方 `codex` CLI
+- `codex login` 可正常在浏览器中完成授权
+
+这个 skill 直接从当前公开 GitHub 仓库分发。用户通过 `npx skills add` 安装后，`skills.sh` 会基于匿名安装遥测自动收录，不需要单独人工发布。
+
 ## 首次引导
 
 安装后运行：
