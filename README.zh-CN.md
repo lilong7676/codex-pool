@@ -19,6 +19,10 @@
 - `codex-pool` 可以从旧版 `codex-tools` 仓库一次性导入账号
 - 真正生效的 live auth 仍然是 `~/.codex/auth.json`
 
+`codex-pool --list` 输出示意：
+
+![codex-pool --list 输出截图](./docs/screenshots/codex_pool--list.png)
+
 ## 安装
 
 发布后可直接执行：

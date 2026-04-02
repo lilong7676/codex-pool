@@ -19,6 +19,10 @@ Compared with the desktop `codex-tools`, `codex-pool` is:
 - Able to import accounts from the legacy `codex-tools` repository in one shot
 - Still relying on `~/.codex/auth.json` as the live auth that actually takes effect
 
+Example output from `codex-pool --list`:
+
+![Screenshot of codex-pool --list output](./docs/screenshots/codex_pool--list.png)
+
 ## Installation
 
 After a release is published, install it with:
