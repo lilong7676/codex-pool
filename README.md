@@ -11,13 +11,15 @@ Thanks to [codex-tools](https://github.com/170-carry/codex-tools) for the proven
 - Switching to the best available account with one command
 - Launching `codex` immediately after switching
 - Re-authorizing expired accounts
+- Exposing a local OpenAI / Anthropic compatible proxy API with multi-account balancing
 
 Compared with the desktop `codex-tools`, `codex-pool` is:
 
-- CLI-only, with no GUI, tray, proxy, or cloudflared features
+- CLI-first, with no GUI, tray, or cloudflared features
 - Using its own account store at `~/.codex-pool/accounts.json`
 - Able to import accounts from the legacy `codex-tools` repository in one shot
 - Still relying on `~/.codex/auth.json` as the live auth that actually takes effect
+- Able to run a local compatibility proxy without mutating the live auth file per request
 
 Example output from `codex-pool --list`:
 
@@ -34,7 +36,7 @@ curl -fsSL https://github.com/lilong7676/codex-pool/releases/latest/download/ins
 By default, it installs to `~/.local/bin`. Override it with environment variables if needed:
 
 ```bash
-INSTALL_DIR="$HOME/bin" VERSION="v0.1.2" curl -fsSL https://github.com/lilong7676/codex-pool/releases/latest/download/install.sh | sh
+INSTALL_DIR="$HOME/bin" VERSION="v0.1.3" curl -fsSL https://github.com/lilong7676/codex-pool/releases/latest/download/install.sh | sh
 ```
 
 Prerequisites:
@@ -51,7 +53,7 @@ You can also install `codex-pool` as a Codex skill:
 npx skills add lilong7676/codex-pool --skill codex-pool
 ```
 
-The skill lives in `skills/codex-pool/` in this repository. On first use it checks whether `codex-pool` is already available and whether its version matches the skill's pinned `v0.1.2` release. If it is missing or older, the skill explains that it will download the pinned archive plus its SHA256 file from this repository's GitHub Releases, verify the checksum, and install or upgrade the binary in `~/.local/bin` (or `INSTALL_DIR`). It only proceeds after explicit user confirmation.
+The skill lives in `skills/codex-pool/` in this repository. On first use it checks whether `codex-pool` is already available and whether its version matches the skill's pinned `v0.1.3` release. If it is missing or older, the skill explains that it will download the pinned archive plus its SHA256 file from this repository's GitHub Releases, verify the checksum, and install or upgrade the binary in `~/.local/bin` (or `INSTALL_DIR`). It only proceeds after explicit user confirmation.
 
 Skill prerequisites stay the same:
 
@@ -79,7 +81,7 @@ codex-pool update
 Pin a specific release tag:
 
 ```bash
-codex-pool update --version v0.1.2
+codex-pool update --version v0.1.3
 ```
 
 If you prefer the published shell installer, rerun:
@@ -172,6 +174,104 @@ Run health checks:
 ```bash
 codex-pool doctor
 codex-pool update --yes
+```
+
+Run the local proxy:
+
+```bash
+codex-pool serve
+codex-pool serve --daemon
+codex-pool serve-status
+codex-pool serve-stop
+codex-pool serve-restart --daemon
+codex-pool serve-logs
+codex-pool serve-logs --follow
+codex-pool serve --listen 127.0.0.1:4141 --api-key codex-pool-local
+codex-pool serve --default-model gpt-5.4 --cwd /path/to/worktree
+```
+
+## Local Proxy
+
+`codex-pool serve` starts a local HTTP proxy that load-balances requests across stored accounts without rewriting your real `~/.codex/auth.json`. Each account maintains a small pool of persistent `codex app-server` workers, and each request still runs in an isolated account-specific `HOME`.
+
+Supported endpoints:
+
+- `POST /v1/chat/completions`
+- `GET /v1/models`
+- `POST /v1/messages`
+- `GET /healthz`
+- `GET /admin/accounts`
+
+Authentication headers:
+
+- OpenAI-compatible routes: `Authorization: Bearer <api_key>`
+- Anthropic-compatible routes: `x-api-key: <api_key>`
+- Anthropic-compatible routes also require `anthropic-version: 2023-06-01`
+
+Streaming:
+
+- OpenAI-compatible streaming returns `chat.completion.chunk` SSE plus `data: [DONE]`
+- Anthropic-compatible streaming returns named SSE events such as `message_start`, `content_block_delta`, and `message_stop`
+
+Background mode:
+
+- `codex-pool serve --daemon` starts the proxy in the background
+- `codex-pool serve-status` shows whether the background proxy is running
+- `codex-pool serve-stop` stops the background proxy
+- `codex-pool serve-restart --daemon` restarts the background proxy with updated options
+- `codex-pool serve-logs` prints recent proxy logs
+- `codex-pool serve-logs --follow` tails the proxy log
+- The PID is stored at `~/.codex-pool/proxy.pid`
+- Logs are appended to `~/.codex-pool/proxy.log`
+
+Current compatibility limits:
+
+- OpenAI: `model`, `messages`, `stream`
+- Anthropic: `model`, `system`, `messages`, `max_tokens`, `stream`
+- Text-only inputs; no tools, no images, no documents, no thinking blocks, no session stickiness
+
+Example OpenAI-compatible request:
+
+```bash
+curl http://127.0.0.1:4141/v1/chat/completions \
+  -H 'Authorization: Bearer codex-pool-local' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "model": "codex",
+    "messages": [{"role": "user", "content": "Say hi in one sentence."}]
+  }'
+```
+
+Example Anthropic-compatible request:
+
+```bash
+curl http://127.0.0.1:4141/v1/messages \
+  -H 'x-api-key: codex-pool-local' \
+  -H 'anthropic-version: 2023-06-01' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "model": "codex",
+    "max_tokens": 256,
+    "messages": [{"role": "user", "content": "Say hi in one sentence."}]
+  }'
+```
+
+Proxy config lives in `~/.codex-pool/config.toml` under `[proxy]`:
+
+```toml
+[proxy]
+listen = "127.0.0.1:4141"
+api_key = "codex-pool-local"
+default_cwd = "/absolute/path/to/worktree"
+default_model = "gpt-5.4"
+sandbox = "workspace-write"
+approval_policy = "never"
+usage_refresh_interval_seconds = 60
+max_concurrent_requests = 8
+max_inflight_per_account = 1
+
+[proxy.model_aliases]
+codex = "gpt-5.4"
 ```
 
 ## Account Reference Rules

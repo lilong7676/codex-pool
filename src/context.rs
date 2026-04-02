@@ -29,6 +29,8 @@ pub struct AppPaths {
     pub data_dir: PathBuf,
     pub store_path: PathBuf,
     pub config_path: PathBuf,
+    pub proxy_pid_path: PathBuf,
+    pub proxy_log_path: PathBuf,
     pub live_auth_path: PathBuf,
     pub codex_config_path: PathBuf,
 }
@@ -43,6 +45,8 @@ impl AppPaths {
         let data_dir = home_dir.join(".codex-pool");
         let store_path = data_dir.join("accounts.json");
         let config_path = data_dir.join("config.toml");
+        let proxy_pid_path = data_dir.join("proxy.pid");
+        let proxy_log_path = data_dir.join("proxy.log");
         let live_auth_path = home_dir.join(".codex").join("auth.json");
         let codex_config_path = home_dir.join(".codex").join("config.toml");
 
@@ -51,6 +55,8 @@ impl AppPaths {
             data_dir,
             store_path,
             config_path,
+            proxy_pid_path,
+            proxy_log_path,
             live_auth_path,
             codex_config_path,
         }
@@ -124,20 +130,26 @@ impl AppContext {
             let _ = fs::create_dir_all(parent);
         }
         if !self.paths.config_path.exists() {
-            self.save_config(&AppConfig::default())?;
+            self.save_config(&self.default_config())?;
         }
         Ok(())
     }
 
     pub fn load_config(&self) -> Result<AppConfig> {
         if !self.paths.config_path.exists() {
-            return Ok(AppConfig::default());
+            return Ok(self.default_config());
         }
 
         let raw = fs::read_to_string(&self.paths.config_path)
             .with_context(|| format!("failed to read {}", self.paths.config_path.display()))?;
-        toml::from_str(&raw)
-            .with_context(|| format!("invalid config file {}", self.paths.config_path.display()))
+        let mut config: AppConfig = toml::from_str(&raw)
+            .with_context(|| format!("invalid config file {}", self.paths.config_path.display()))?;
+        let cwd = env::current_dir()
+            .unwrap_or_else(|_| self.paths.home_dir.clone())
+            .display()
+            .to_string();
+        config.proxy.normalize(&cwd);
+        Ok(config)
     }
 
     pub fn save_config(&self, config: &AppConfig) -> Result<()> {
@@ -146,6 +158,16 @@ impl AppContext {
             .with_context(|| format!("failed to write {}", self.paths.config_path.display()))?;
         set_private_permissions(&self.paths.config_path);
         Ok(())
+    }
+
+    pub fn default_config(&self) -> AppConfig {
+        let mut config = AppConfig::default();
+        let cwd = env::current_dir()
+            .unwrap_or_else(|_| self.paths.home_dir.clone())
+            .display()
+            .to_string();
+        config.proxy.normalize(&cwd);
+        config
     }
 
     pub fn new_codex_command(&self) -> Result<Command> {

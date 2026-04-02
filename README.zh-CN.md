@@ -11,13 +11,15 @@
 - 一键切换到最佳可用账号
 - 直接切换后启动 `codex`
 - 对过期账号执行重新授权
+- 暴露本地 OpenAI / Anthropic 兼容代理 API，并对多个账号做负载均衡
 
 它和桌面版 `codex-tools` 的关系是：
 
-- `codex-pool` 只做 CLI，不做 GUI、tray、proxy、cloudflared
+- `codex-pool` 以 CLI 为主，不做 GUI、tray、cloudflared
 - `codex-pool` 独立使用 `~/.codex-pool/accounts.json`
 - `codex-pool` 可以从旧版 `codex-tools` 仓库一次性导入账号
 - 真正生效的 live auth 仍然是 `~/.codex/auth.json`
+- 也可以启动本地兼容代理，而且不会为每个请求去改写真实 live auth
 
 `codex-pool --list` 输出示意：
 
@@ -34,7 +36,7 @@ curl -fsSL https://github.com/lilong7676/codex-pool/releases/latest/download/ins
 默认安装到 `~/.local/bin`。可通过环境变量覆盖：
 
 ```bash
-INSTALL_DIR="$HOME/bin" VERSION="v0.1.2" curl -fsSL https://github.com/lilong7676/codex-pool/releases/latest/download/install.sh | sh
+INSTALL_DIR="$HOME/bin" VERSION="v0.1.3" curl -fsSL https://github.com/lilong7676/codex-pool/releases/latest/download/install.sh | sh
 ```
 
 前置要求：
@@ -51,7 +53,7 @@ INSTALL_DIR="$HOME/bin" VERSION="v0.1.2" curl -fsSL https://github.com/lilong767
 npx skills add lilong7676/codex-pool --skill codex-pool
 ```
 
-skill 目录位于当前仓库的 `skills/codex-pool/`。首次使用时，它会先检查本机是否已有 `codex-pool`，以及当前版本是否与 skill 固定的 `v0.1.2` 一致。如果缺失或版本落后，skill 会先说明将从当前仓库的 GitHub Releases 下载固定版本归档和对应 SHA256 文件，校验成功后安装或升级到 `~/.local/bin`（或 `INSTALL_DIR`），并且只有在用户明确确认后才继续。
+skill 目录位于当前仓库的 `skills/codex-pool/`。首次使用时，它会先检查本机是否已有 `codex-pool`，以及当前版本是否与 skill 固定的 `v0.1.3` 一致。如果缺失或版本落后，skill 会先说明将从当前仓库的 GitHub Releases 下载固定版本归档和对应 SHA256 文件，校验成功后安装或升级到 `~/.local/bin`（或 `INSTALL_DIR`），并且只有在用户明确确认后才继续。
 
 skill 的前置要求不变：
 
@@ -79,7 +81,7 @@ codex-pool update
 固定到某个 release tag：
 
 ```bash
-codex-pool update --version v0.1.2
+codex-pool update --version v0.1.3
 ```
 
 如果你更倾向于走发布脚本，也可以重新执行：
@@ -172,6 +174,104 @@ codex-pool reauth <account-ref>
 ```bash
 codex-pool doctor
 codex-pool update --yes
+```
+
+启动本地代理：
+
+```bash
+codex-pool serve
+codex-pool serve --daemon
+codex-pool serve-status
+codex-pool serve-stop
+codex-pool serve-restart --daemon
+codex-pool serve-logs
+codex-pool serve-logs --follow
+codex-pool serve --listen 127.0.0.1:4141 --api-key codex-pool-local
+codex-pool serve --default-model gpt-5.4 --cwd /path/to/worktree
+```
+
+## 本地代理
+
+`codex-pool serve` 会启动一个本地 HTTP 代理，在不改写真实 `~/.codex/auth.json` 的前提下，把请求分发到账号池中的不同账号。每个账号会维护一个小型常驻 `codex app-server` worker 池，而每个请求仍然运行在隔离的账号专属 `HOME` 中。
+
+支持的端点：
+
+- `POST /v1/chat/completions`
+- `GET /v1/models`
+- `POST /v1/messages`
+- `GET /healthz`
+- `GET /admin/accounts`
+
+鉴权头：
+
+- OpenAI 兼容路由：`Authorization: Bearer <api_key>`
+- Anthropic 兼容路由：`x-api-key: <api_key>`
+- Anthropic 兼容路由还要求 `anthropic-version: 2023-06-01`
+
+流式返回：
+
+- OpenAI 兼容流式返回 `chat.completion.chunk` SSE，末尾是 `data: [DONE]`
+- Anthropic 兼容流式返回命名 SSE 事件，比如 `message_start`、`content_block_delta`、`message_stop`
+
+后台运行：
+
+- `codex-pool serve --daemon` 会把代理放到后台启动
+- `codex-pool serve-status` 可查看后台代理是否仍在运行
+- `codex-pool serve-stop` 可停止后台代理
+- `codex-pool serve-restart --daemon` 可带着新参数重启后台代理
+- `codex-pool serve-logs` 可查看最近的代理日志
+- `codex-pool serve-logs --follow` 可持续跟踪代理日志
+- PID 会写入 `~/.codex-pool/proxy.pid`
+- 日志会追加写入 `~/.codex-pool/proxy.log`
+
+当前兼容范围：
+
+- OpenAI：`model`、`messages`、`stream`
+- Anthropic：`model`、`system`、`messages`、`max_tokens`、`stream`
+- 只支持文本输入；不支持 tools、图片、文档、thinking block，也不支持会话粘性
+
+OpenAI 兼容请求示例：
+
+```bash
+curl http://127.0.0.1:4141/v1/chat/completions \
+  -H 'Authorization: Bearer codex-pool-local' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "model": "codex",
+    "messages": [{"role": "user", "content": "用一句话打个招呼。"}]
+  }'
+```
+
+Anthropic 兼容请求示例：
+
+```bash
+curl http://127.0.0.1:4141/v1/messages \
+  -H 'x-api-key: codex-pool-local' \
+  -H 'anthropic-version: 2023-06-01' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "model": "codex",
+    "max_tokens": 256,
+    "messages": [{"role": "user", "content": "用一句话打个招呼。"}]
+  }'
+```
+
+代理配置写在 `~/.codex-pool/config.toml` 的 `[proxy]` 下：
+
+```toml
+[proxy]
+listen = "127.0.0.1:4141"
+api_key = "codex-pool-local"
+default_cwd = "/absolute/path/to/worktree"
+default_model = "gpt-5.4"
+sandbox = "workspace-write"
+approval_policy = "never"
+usage_refresh_interval_seconds = 60
+max_concurrent_requests = 8
+max_inflight_per_account = 1
+
+[proxy.model_aliases]
+codex = "gpt-5.4"
 ```
 
 ## 账号引用规则

@@ -1,5 +1,10 @@
 use std::io;
 use std::io::IsTerminal;
+use std::fs;
+use std::fs::OpenOptions;
+use std::io::BufRead;
+use std::io::Seek;
+use std::io::SeekFrom;
 use std::os::unix::process::CommandExt;
 use std::path::PathBuf;
 use std::process::Stdio;
@@ -18,6 +23,7 @@ use crate::models::AccountsStore;
 use crate::models::ImportStats;
 use crate::models::StoredAccount;
 use crate::output::render_account_table;
+use crate::proxy;
 use crate::ranking::pick_best_account;
 use crate::store;
 use crate::updater;
@@ -87,6 +93,58 @@ enum Commands {
         #[arg(long)]
         yes: bool,
     },
+    Serve {
+        #[arg(long)]
+        daemon: bool,
+        #[arg(long)]
+        listen: Option<String>,
+        #[arg(long)]
+        cwd: Option<PathBuf>,
+        #[arg(long)]
+        api_key: Option<String>,
+        #[arg(long)]
+        default_model: Option<String>,
+        #[arg(long)]
+        sandbox: Option<String>,
+        #[arg(long)]
+        approval_policy: Option<String>,
+        #[arg(long)]
+        usage_refresh_interval: Option<u64>,
+        #[arg(long)]
+        max_concurrent_requests: Option<usize>,
+        #[arg(long)]
+        max_inflight_per_account: Option<usize>,
+    },
+    ServeStatus,
+    ServeStop,
+    ServeLogs {
+        #[arg(long, default_value_t = 50)]
+        lines: usize,
+        #[arg(long)]
+        follow: bool,
+    },
+    ServeRestart {
+        #[arg(long)]
+        daemon: bool,
+        #[arg(long)]
+        listen: Option<String>,
+        #[arg(long)]
+        cwd: Option<PathBuf>,
+        #[arg(long)]
+        api_key: Option<String>,
+        #[arg(long)]
+        default_model: Option<String>,
+        #[arg(long)]
+        sandbox: Option<String>,
+        #[arg(long)]
+        approval_policy: Option<String>,
+        #[arg(long)]
+        usage_refresh_interval: Option<u64>,
+        #[arg(long)]
+        max_concurrent_requests: Option<usize>,
+        #[arg(long)]
+        max_inflight_per_account: Option<usize>,
+    },
     Doctor,
 }
 
@@ -137,7 +195,311 @@ pub async fn run_cli() -> Result<()> {
             codex_args,
         } => run_command(&context, account_ref.as_deref(), best, &codex_args).await,
         Commands::Update { version, yes } => update_command(version.as_deref(), yes).await,
+        Commands::Serve {
+            daemon,
+            listen,
+            cwd,
+            api_key,
+            default_model,
+            sandbox,
+            approval_policy,
+            usage_refresh_interval,
+            max_concurrent_requests,
+            max_inflight_per_account,
+        } => {
+            let options = proxy::ServeOptions {
+                listen,
+                cwd,
+                api_key,
+                default_model,
+                sandbox,
+                approval_policy,
+                usage_refresh_interval,
+                max_concurrent_requests,
+                max_inflight_per_account,
+            };
+            if daemon {
+                serve_daemon_command(&context, &options)
+            } else {
+                proxy::serve(context, options).await
+            }
+        }
+        Commands::ServeStatus => serve_status_command(&context),
+        Commands::ServeStop => serve_stop_command(&context),
+        Commands::ServeLogs { lines, follow } => serve_logs_command(&context, lines, follow),
+        Commands::ServeRestart {
+            daemon,
+            listen,
+            cwd,
+            api_key,
+            default_model,
+            sandbox,
+            approval_policy,
+            usage_refresh_interval,
+            max_concurrent_requests,
+            max_inflight_per_account,
+        } => {
+            let options = proxy::ServeOptions {
+                listen,
+                cwd,
+                api_key,
+                default_model,
+                sandbox,
+                approval_policy,
+                usage_refresh_interval,
+                max_concurrent_requests,
+                max_inflight_per_account,
+            };
+            serve_restart_command(&context, &options, daemon).await
+        }
         Commands::Doctor => doctor_command(&context),
+    }
+}
+
+fn serve_daemon_command(context: &AppContext, options: &proxy::ServeOptions) -> Result<()> {
+    if let Some(existing_pid) = read_proxy_pid(context)? {
+        if process_is_alive(existing_pid) {
+            println!(
+                "codex-pool proxy is already running: pid={}, log={}",
+                existing_pid,
+                context.paths.proxy_log_path.display()
+            );
+            return Ok(());
+        }
+        let _ = fs::remove_file(&context.paths.proxy_pid_path);
+    }
+
+    let current_exe = std::env::current_exe().context("failed to resolve current executable")?;
+    let log_path = context.paths.proxy_log_path.clone();
+    let log_file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&log_path)
+        .with_context(|| format!("failed to open {}", log_path.display()))?;
+    let stderr_file = log_file
+        .try_clone()
+        .with_context(|| format!("failed to clone {}", log_path.display()))?;
+
+    let mut command = std::process::Command::new(current_exe);
+    command
+        .arg("serve")
+        .stdin(Stdio::null())
+        .stdout(Stdio::from(log_file))
+        .stderr(Stdio::from(stderr_file))
+        .current_dir(
+            std::env::current_dir().unwrap_or_else(|_| context.paths.home_dir.clone()),
+        );
+
+    if let Some(listen) = options.listen.as_deref() {
+        command.arg("--listen").arg(listen);
+    }
+    if let Some(cwd) = options.cwd.as_deref() {
+        command.arg("--cwd").arg(cwd);
+    }
+    if let Some(api_key) = options.api_key.as_deref() {
+        command.arg("--api-key").arg(api_key);
+    }
+    if let Some(default_model) = options.default_model.as_deref() {
+        command.arg("--default-model").arg(default_model);
+    }
+    if let Some(sandbox) = options.sandbox.as_deref() {
+        command.arg("--sandbox").arg(sandbox);
+    }
+    if let Some(approval_policy) = options.approval_policy.as_deref() {
+        command.arg("--approval-policy").arg(approval_policy);
+    }
+    if let Some(interval) = options.usage_refresh_interval {
+        command.arg("--usage-refresh-interval").arg(interval.to_string());
+    }
+    if let Some(max_concurrent_requests) = options.max_concurrent_requests {
+        command
+            .arg("--max-concurrent-requests")
+            .arg(max_concurrent_requests.to_string());
+    }
+    if let Some(max_inflight_per_account) = options.max_inflight_per_account {
+        command
+            .arg("--max-inflight-per-account")
+            .arg(max_inflight_per_account.to_string());
+    }
+
+    let child = command
+        .spawn()
+        .context("failed to spawn background proxy server")?;
+    fs::write(&context.paths.proxy_pid_path, format!("{}\n", child.id()))
+        .with_context(|| format!("failed to write {}", context.paths.proxy_pid_path.display()))?;
+    println!(
+        "codex-pool proxy started in background: pid={}, log={}",
+        child.id(),
+        log_path.display()
+    );
+    Ok(())
+}
+
+fn serve_status_command(context: &AppContext) -> Result<()> {
+    match read_proxy_pid(context)? {
+        Some(pid) if process_is_alive(pid) => {
+            println!(
+                "codex-pool proxy is running: pid={}, log={}",
+                pid,
+                context.paths.proxy_log_path.display()
+            );
+        }
+        Some(pid) => {
+            println!(
+                "codex-pool proxy is not running; removing stale pid file for pid={}",
+                pid
+            );
+            let _ = fs::remove_file(&context.paths.proxy_pid_path);
+        }
+        None => {
+            println!(
+                "codex-pool proxy is not running (no pid file at {})",
+                context.paths.proxy_pid_path.display()
+            );
+        }
+    }
+    Ok(())
+}
+
+fn serve_stop_command(context: &AppContext) -> Result<()> {
+    let Some(pid) = read_proxy_pid(context)? else {
+        println!("codex-pool proxy is not running");
+        return Ok(());
+    };
+
+    if !process_is_alive(pid) {
+        let _ = fs::remove_file(&context.paths.proxy_pid_path);
+        println!("codex-pool proxy is not running (removed stale pid file)");
+        return Ok(());
+    }
+
+    let status = std::process::Command::new("kill")
+        .arg(pid.to_string())
+        .status()
+        .context("failed to send SIGTERM to background proxy")?;
+    if !status.success() {
+        anyhow::bail!("failed to stop background proxy pid={pid}");
+    }
+
+    for _ in 0..20 {
+        if !process_is_alive(pid) {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(200));
+    }
+
+    if process_is_alive(pid) {
+        anyhow::bail!("background proxy pid={pid} did not exit after SIGTERM");
+    }
+
+    let _ = fs::remove_file(&context.paths.proxy_pid_path);
+    println!("codex-pool proxy stopped: pid={pid}");
+    Ok(())
+}
+
+fn serve_logs_command(context: &AppContext, lines: usize, follow: bool) -> Result<()> {
+    let log_path = &context.paths.proxy_log_path;
+    if !log_path.exists() {
+        anyhow::bail!("proxy log does not exist yet: {}", log_path.display());
+    }
+
+    print_log_tail(log_path, lines)?;
+    if follow {
+        follow_log(log_path)?;
+    }
+    Ok(())
+}
+
+async fn serve_restart_command(
+    context: &AppContext,
+    options: &proxy::ServeOptions,
+    daemon: bool,
+) -> Result<()> {
+    if let Some(pid) = read_proxy_pid(context)? {
+        if process_is_alive(pid) {
+            serve_stop_command(context)?;
+        } else {
+            let _ = fs::remove_file(&context.paths.proxy_pid_path);
+        }
+    }
+
+    if daemon {
+        serve_daemon_command(context, options)
+    } else {
+        proxy::serve(context.clone(), options.clone()).await
+    }
+}
+
+fn read_proxy_pid(context: &AppContext) -> Result<Option<u32>> {
+    if !context.paths.proxy_pid_path.exists() {
+        return Ok(None);
+    }
+    let raw = fs::read_to_string(&context.paths.proxy_pid_path)
+        .with_context(|| format!("failed to read {}", context.paths.proxy_pid_path.display()))?;
+    let pid = raw
+        .trim()
+        .parse::<u32>()
+        .with_context(|| format!("invalid pid file {}", context.paths.proxy_pid_path.display()))?;
+    Ok(Some(pid))
+}
+
+fn process_is_alive(pid: u32) -> bool {
+    std::process::Command::new("kill")
+        .arg("-0")
+        .arg(pid.to_string())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false)
+}
+
+fn print_log_tail(path: &PathBuf, lines: usize) -> Result<()> {
+    let file = fs::File::open(path).with_context(|| format!("failed to open {}", path.display()))?;
+    let reader = io::BufReader::new(file);
+    let collected = reader
+        .lines()
+        .collect::<std::result::Result<Vec<_>, _>>()
+        .with_context(|| format!("failed to read {}", path.display()))?;
+    let start = collected.len().saturating_sub(lines);
+    for line in &collected[start..] {
+        println!("{line}");
+    }
+    Ok(())
+}
+
+fn follow_log(path: &PathBuf) -> Result<()> {
+    let mut file =
+        fs::File::open(path).with_context(|| format!("failed to open {}", path.display()))?;
+    let mut position = file
+        .seek(SeekFrom::End(0))
+        .with_context(|| format!("failed to seek {}", path.display()))?;
+
+    loop {
+        let metadata = file
+            .metadata()
+            .with_context(|| format!("failed to stat {}", path.display()))?;
+        let len = metadata.len();
+        if len < position {
+            file = fs::File::open(path)
+                .with_context(|| format!("failed to reopen {}", path.display()))?;
+            position = 0;
+        } else if len > position {
+            file.seek(SeekFrom::Start(position))
+                .with_context(|| format!("failed to seek {}", path.display()))?;
+            let mut reader = io::BufReader::new(&file);
+            let mut line = String::new();
+            loop {
+                line.clear();
+                let bytes = reader.read_line(&mut line)?;
+                if bytes == 0 {
+                    break;
+                }
+                print!("{line}");
+            }
+            position = file.stream_position()?;
+        }
+        std::thread::sleep(Duration::from_millis(500));
     }
 }
 
@@ -328,6 +690,7 @@ async fn run_command(
 fn doctor_command(context: &AppContext) -> Result<()> {
     let live = auth::read_current_auth_status(context)?;
     let store = store::load_store(context)?;
+    let config = context.load_config()?;
     println!(
         "codex_cli={}",
         context
@@ -339,6 +702,18 @@ fn doctor_command(context: &AppContext) -> Result<()> {
     println!("data_dir={}", context.paths.data_dir.display());
     println!("store_path={}", context.paths.store_path.display());
     println!("account_count={}", store.accounts.len());
+    println!("proxy_listen={}", config.proxy.listen);
+    println!("proxy_default_cwd={}", config.proxy.default_cwd);
+    println!("proxy_default_model={}", config.proxy.default_model);
+    println!("proxy_api_key={}", mask_secret(&config.proxy.api_key));
+    println!(
+        "proxy_max_concurrent_requests={}",
+        config.proxy.max_concurrent_requests
+    );
+    println!(
+        "proxy_max_inflight_per_account={}",
+        config.proxy.max_inflight_per_account
+    );
     println!(
         "live_auth={}",
         if live.available {
@@ -355,6 +730,14 @@ fn doctor_command(context: &AppContext) -> Result<()> {
             .unwrap_or_else(|| "not found".to_string())
     );
     Ok(())
+}
+
+fn mask_secret(value: &str) -> String {
+    if value.len() <= 4 {
+        "*".repeat(value.len())
+    } else {
+        format!("{}***", &value[..4])
+    }
 }
 
 fn remove_account_command(context: &AppContext, account_ref: &str) -> Result<()> {

@@ -84,6 +84,7 @@ tar -xzf "$tmp_dir/$archive" -C "$tmp_dir"
 install -m 0755 "$tmp_dir/$BIN_NAME" "$INSTALL_DIR/$BIN_NAME"
 
 echo "Installed to $INSTALL_DIR/$BIN_NAME"
+"$INSTALL_DIR/$BIN_NAME" --version
 
 case ":$PATH:" in
   *":$INSTALL_DIR:"*) ;;

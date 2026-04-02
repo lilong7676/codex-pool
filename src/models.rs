@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fmt;
 
 use serde::Deserialize;
@@ -184,6 +185,8 @@ pub struct AppConfig {
     pub version: u8,
     #[serde(default = "default_watch_interval_seconds")]
     pub default_watch_interval_seconds: u64,
+    #[serde(default)]
+    pub proxy: ProxyConfig,
 }
 
 pub fn default_watch_interval_seconds() -> u64 {
@@ -195,7 +198,123 @@ impl Default for AppConfig {
         Self {
             version: default_store_version(),
             default_watch_interval_seconds: default_watch_interval_seconds(),
+            proxy: ProxyConfig::default(),
         }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProxyConfig {
+    #[serde(default = "default_proxy_listen")]
+    pub listen: String,
+    #[serde(default = "default_proxy_api_key")]
+    pub api_key: String,
+    #[serde(default = "default_proxy_default_cwd")]
+    pub default_cwd: String,
+    #[serde(default = "default_proxy_default_model")]
+    pub default_model: String,
+    #[serde(default = "default_proxy_sandbox")]
+    pub sandbox: String,
+    #[serde(default = "default_proxy_approval_policy")]
+    pub approval_policy: String,
+    #[serde(default = "default_proxy_usage_refresh_interval_seconds")]
+    pub usage_refresh_interval_seconds: u64,
+    #[serde(default = "default_proxy_max_concurrent_requests")]
+    pub max_concurrent_requests: usize,
+    #[serde(default = "default_proxy_max_inflight_per_account")]
+    pub max_inflight_per_account: usize,
+    #[serde(default)]
+    pub model_aliases: BTreeMap<String, String>,
+}
+
+pub fn default_proxy_listen() -> String {
+    "127.0.0.1:4141".to_string()
+}
+
+pub fn default_proxy_api_key() -> String {
+    "codex-pool-local".to_string()
+}
+
+pub fn default_proxy_default_cwd() -> String {
+    ".".to_string()
+}
+
+pub fn default_proxy_default_model() -> String {
+    "gpt-5.4".to_string()
+}
+
+pub fn default_proxy_sandbox() -> String {
+    "workspace-write".to_string()
+}
+
+pub fn default_proxy_approval_policy() -> String {
+    "never".to_string()
+}
+
+pub fn default_proxy_usage_refresh_interval_seconds() -> u64 {
+    60
+}
+
+pub fn default_proxy_max_concurrent_requests() -> usize {
+    8
+}
+
+pub fn default_proxy_max_inflight_per_account() -> usize {
+    1
+}
+
+impl Default for ProxyConfig {
+    fn default() -> Self {
+        let default_model = default_proxy_default_model();
+        let mut model_aliases = BTreeMap::new();
+        model_aliases.insert("codex".to_string(), default_model.clone());
+        Self {
+            listen: default_proxy_listen(),
+            api_key: default_proxy_api_key(),
+            default_cwd: default_proxy_default_cwd(),
+            default_model,
+            sandbox: default_proxy_sandbox(),
+            approval_policy: default_proxy_approval_policy(),
+            usage_refresh_interval_seconds: default_proxy_usage_refresh_interval_seconds(),
+            max_concurrent_requests: default_proxy_max_concurrent_requests(),
+            max_inflight_per_account: default_proxy_max_inflight_per_account(),
+            model_aliases,
+        }
+    }
+}
+
+impl ProxyConfig {
+    pub fn normalize(&mut self, cwd: &str) {
+        if self.default_cwd.trim().is_empty() || self.default_cwd == "." {
+            self.default_cwd = cwd.to_string();
+        }
+        if self.default_model.trim().is_empty() {
+            self.default_model = default_proxy_default_model();
+        }
+        if self.listen.trim().is_empty() {
+            self.listen = default_proxy_listen();
+        }
+        if self.api_key.trim().is_empty() {
+            self.api_key = default_proxy_api_key();
+        }
+        if self.sandbox.trim().is_empty() {
+            self.sandbox = default_proxy_sandbox();
+        }
+        if self.approval_policy.trim().is_empty() {
+            self.approval_policy = default_proxy_approval_policy();
+        }
+        if self.usage_refresh_interval_seconds == 0 {
+            self.usage_refresh_interval_seconds = default_proxy_usage_refresh_interval_seconds();
+        }
+        if self.max_concurrent_requests == 0 {
+            self.max_concurrent_requests = default_proxy_max_concurrent_requests();
+        }
+        if self.max_inflight_per_account == 0 {
+            self.max_inflight_per_account = default_proxy_max_inflight_per_account();
+        }
+        self.model_aliases
+            .entry("codex".to_string())
+            .or_insert_with(|| self.default_model.clone());
     }
 }
 

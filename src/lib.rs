@@ -3,6 +3,7 @@ pub mod commands;
 pub mod context;
 pub mod models;
 pub mod output;
+pub mod proxy;
 pub mod ranking;
 pub mod store;
 pub mod updater;
