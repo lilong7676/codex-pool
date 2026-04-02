@@ -36,7 +36,7 @@ curl -fsSL https://github.com/lilong7676/codex-pool/releases/latest/download/ins
 默认安装到 `~/.local/bin`。可通过环境变量覆盖：
 
 ```bash
-INSTALL_DIR="$HOME/bin" VERSION="v0.1.3" curl -fsSL https://github.com/lilong7676/codex-pool/releases/latest/download/install.sh | sh
+INSTALL_DIR="$HOME/bin" VERSION="v0.1.4" curl -fsSL https://github.com/lilong7676/codex-pool/releases/latest/download/install.sh | sh
 ```
 
 前置要求：
@@ -53,7 +53,7 @@ INSTALL_DIR="$HOME/bin" VERSION="v0.1.3" curl -fsSL https://github.com/lilong767
 npx skills add lilong7676/codex-pool --skill codex-pool
 ```
 
-skill 目录位于当前仓库的 `skills/codex-pool/`。首次使用时，它会先检查本机是否已有 `codex-pool`，以及当前版本是否与 skill 固定的 `v0.1.3` 一致。如果缺失或版本落后，skill 会先说明将从当前仓库的 GitHub Releases 下载固定版本归档和对应 SHA256 文件，校验成功后安装或升级到 `~/.local/bin`（或 `INSTALL_DIR`），并且只有在用户明确确认后才继续。
+skill 目录位于当前仓库的 `skills/codex-pool/`。首次使用时，它会先检查本机是否已有 `codex-pool`，以及当前版本是否与 skill 固定的 `v0.1.4` 一致。如果缺失或版本落后，skill 会先说明将从当前仓库的 GitHub Releases 下载固定版本归档和对应 SHA256 文件，校验成功后安装或升级到 `~/.local/bin`（或 `INSTALL_DIR`），并且只有在用户明确确认后才继续。
 
 skill 的前置要求不变：
 
@@ -81,7 +81,7 @@ codex-pool update
 固定到某个 release tag：
 
 ```bash
-codex-pool update --version v0.1.3
+codex-pool update --version v0.1.4
 ```
 
 如果你更倾向于走发布脚本，也可以重新执行：

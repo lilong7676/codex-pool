@@ -142,6 +142,8 @@ impl AppContext {
 
         let raw = fs::read_to_string(&self.paths.config_path)
             .with_context(|| format!("failed to read {}", self.paths.config_path.display()))?;
+        let raw_value: toml::Value = toml::from_str(&raw)
+            .with_context(|| format!("invalid config file {}", self.paths.config_path.display()))?;
         let mut config: AppConfig = toml::from_str(&raw)
             .with_context(|| format!("invalid config file {}", self.paths.config_path.display()))?;
         let cwd = env::current_dir()
@@ -149,6 +151,9 @@ impl AppContext {
             .display()
             .to_string();
         config.proxy.normalize(&cwd);
+        if !has_proxy_config_fields(&raw_value) {
+            self.save_config(&config)?;
+        }
         Ok(config)
     }
 
@@ -245,6 +250,47 @@ fn find_codex_cli_path() -> Option<PathBuf> {
     }
 
     None
+}
+
+fn has_proxy_config_fields(value: &toml::Value) -> bool {
+    value
+        .as_table()
+        .and_then(|table| table.get("proxy"))
+        .and_then(toml::Value::as_table)
+        .map(|table| !table.is_empty())
+        .unwrap_or(false)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use tempfile::TempDir;
+
+    use super::*;
+
+    #[test]
+    fn load_config_backfills_default_proxy_section_when_missing() {
+        let temp = TempDir::new().expect("tempdir should exist");
+        let paths = AppPaths::for_home(temp.path().to_path_buf());
+        let context = AppContext::with_paths(paths);
+        context.ensure_layout().expect("layout should exist");
+
+        fs::write(
+            &context.paths.config_path,
+            "version = 1\ndefault_watch_interval_seconds = 30\n",
+        )
+        .expect("config should be written");
+
+        let config = context.load_config().expect("config should load");
+        assert_eq!(config.default_watch_interval_seconds, 30);
+
+        let rewritten =
+            fs::read_to_string(&context.paths.config_path).expect("config should be readable");
+        assert!(rewritten.contains("[proxy]"));
+        assert!(rewritten.contains("listen = \"127.0.0.1:4141\""));
+        assert!(rewritten.contains("api_key = \"codex-pool-local\""));
+    }
 }
 
 fn is_executable_file(path: &Path) -> bool {

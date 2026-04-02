@@ -1,7 +1,7 @@
 ---
 name: codex-pool
 description: Manage multiple Codex CLI accounts with codex-pool, including checking 5h and 1week usage, switching to the best available account, re-authorizing expired accounts, and launching codex after switching.
-version: 0.1.3
+version: 0.1.4
 author: lilong7676
 permissions:
   fileRead: true
@@ -35,8 +35,8 @@ Use this skill when the user wants to inspect, switch, or repair Codex CLI accou
 ## Workflow
 
 1. Check that the official `codex` CLI is installed before doing anything else.
-2. Check whether `codex-pool` is already installed with `command -v codex-pool`, and if present compare its current version to the pinned `v0.1.3` skill version.
-3. If `codex-pool` is missing or older than the pinned skill version, explain that the skill will download the pinned `v0.1.3` release archive and SHA256 file from this repository's GitHub Releases, verify the checksum, and install or upgrade the binary at `${INSTALL_DIR:-$HOME/.local/bin}/codex-pool`.
+2. Check whether `codex-pool` is already installed with `command -v codex-pool`, and if present compare its current version to the pinned `v0.1.4` skill version.
+3. If `codex-pool` is missing or older than the pinned skill version, explain that the skill will download the pinned `v0.1.4` release archive and SHA256 file from this repository's GitHub Releases, verify the checksum, and install or upgrade the binary at `${INSTALL_DIR:-$HOME/.local/bin}/codex-pool`.
 4. Only after explicit user confirmation, install or upgrade it with `CODEX_POOL_INSTALL_APPROVED=1 ./scripts/ensure-codex-pool.sh`.
 5. Prefer non-mutating commands first:
    - `codex-pool doctor`
@@ -64,7 +64,7 @@ Use this skill when the user wants to inspect, switch, or repair Codex CLI accou
 
 ## Recommended Sequence
 
-- If `codex-pool` is missing or older than `v0.1.3`, stop and ask for install or upgrade confirmation before running the installer.
+- If `codex-pool` is missing or older than `v0.1.4`, stop and ask for install or upgrade confirmation before running the installer.
 - Start with `codex-pool doctor` to confirm prerequisites.
 - Use `codex-pool list --refresh` to inspect account status and usage.
 - If the user wants the best account, prefer `codex-pool use --best` after confirmation.

@@ -36,7 +36,7 @@ curl -fsSL https://github.com/lilong7676/codex-pool/releases/latest/download/ins
 By default, it installs to `~/.local/bin`. Override it with environment variables if needed:
 
 ```bash
-INSTALL_DIR="$HOME/bin" VERSION="v0.1.3" curl -fsSL https://github.com/lilong7676/codex-pool/releases/latest/download/install.sh | sh
+INSTALL_DIR="$HOME/bin" VERSION="v0.1.4" curl -fsSL https://github.com/lilong7676/codex-pool/releases/latest/download/install.sh | sh
 ```
 
 Prerequisites:
@@ -53,7 +53,7 @@ You can also install `codex-pool` as a Codex skill:
 npx skills add lilong7676/codex-pool --skill codex-pool
 ```
 
-The skill lives in `skills/codex-pool/` in this repository. On first use it checks whether `codex-pool` is already available and whether its version matches the skill's pinned `v0.1.3` release. If it is missing or older, the skill explains that it will download the pinned archive plus its SHA256 file from this repository's GitHub Releases, verify the checksum, and install or upgrade the binary in `~/.local/bin` (or `INSTALL_DIR`). It only proceeds after explicit user confirmation.
+The skill lives in `skills/codex-pool/` in this repository. On first use it checks whether `codex-pool` is already available and whether its version matches the skill's pinned `v0.1.4` release. If it is missing or older, the skill explains that it will download the pinned archive plus its SHA256 file from this repository's GitHub Releases, verify the checksum, and install or upgrade the binary in `~/.local/bin` (or `INSTALL_DIR`). It only proceeds after explicit user confirmation.
 
 Skill prerequisites stay the same:
 
@@ -81,7 +81,7 @@ codex-pool update
 Pin a specific release tag:
 
 ```bash
-codex-pool update --version v0.1.3
+codex-pool update --version v0.1.4
 ```
 
 If you prefer the published shell installer, rerun:
